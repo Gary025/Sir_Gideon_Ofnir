@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倒计时任务管理器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .task-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover {
+            background: #545b62;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        .task-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .task-header {
+            display: grid;
+            grid-template-columns: 50px 1fr 120px 120px 100px;
+            background: #f8f9fa;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .task-item {
+            display: grid;
+            grid-template-columns: 50px 1fr 120px 120px 100px;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            align-items: center;
+        }
+
+        .task-item:last-child {
+            border-bottom: none;
+        }
+
+        /* 核心修改：渐变色圆形背景 */
+        .timer-display {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 20px auto;
+            border-radius: 50%;
+            /* 渐变色背景（从中心向外扩散） */
+            background: radial-gradient(
+                circle at center,
+                #b3a1e6 0%,    /* 中心淡紫色 */
+                #9b7dd6 20%,   /* 内层紫色 */
+                #8a6bc0 40%,   /* 中层紫色 */
+                #7d5db7 60%,   /* 中外层紫色 */
+                #7253a8 80%,   /* 外层紫色 */
+                #684a99 100%   /* 最外层深紫色 */
+            );
+            /* 内圈装饰 */
+            box-shadow:
+                0 0 0 8px rgba(138, 107, 192, 0.2),
+                inset 0 0 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .timer-display h2 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .timer-display #currentTaskLabel {
+            font-size: 1.1em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>倒计时任务管理器</h1>
+
+        <div class="task-controls">
+            <button id="addTaskBtn">添加任务</button>
+            <button id="modifyTaskBtn" class="secondary">修改任务</button>
+            <button id="deleteTaskBtn" class="danger">删除任务</button>
+            <button id="exportBtn" class="secondary">导出任务</button>
+            <button id="importBtn" class="secondary">导入任务</button>
+            <input type="file" id="fileInput" accept=".csv" class="hidden">
+        </div>
+
+        <div class="task-list">
+            <div class="task-header">
+                <div>序号</div>
+                <div>任务名称</div>
+                <div>总时长</div>
+                <div>剩余时间</div>
+                <div>状态</div>
+            </div>
+            <div id="taskContainer"></div>
+        </div>
+
+        <div class="timer-display">
+            <h2 id="timerLabel">00:00:00</h2>
+            <div id="currentTaskLabel">未选择任务</div>
+        </div>
+
+        <div class="timer-controls">
+            <button id="startTimerBtn">开始计时</button>
+            <button id="pauseTimerBtn" class="secondary">暂停计时</button>
+            <button id="stopTimerBtn" class="danger">停止计时</button>
+        </div>
+    </div>
+
+    <!-- 添加/修改任务模态框 -->
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">添加任务</h2>
+            <div class="form-group">
+                <label for="taskName">任务名称</label>
+                <input type="text" id="taskName" required>
+            </div>
+            <div class="form-group">
+                <label for="taskDuration">时长（秒）</label>
+                <input type="number" id="taskDuration" min="1" required>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelBtn" class="secondary">取消</button>
+                <button id="saveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音频元素（隐藏） -->
+    <audio id="completionSound" src="man.mp3" preload="auto"></audio>
+
+    <script>
+        // 任务类
+        class Task {
+            constructor(name, duration, status = "pending", remaining = null) {
+                this.name = name;
+                this.duration = parseInt(duration);
+                this.status = status;
+                this.remaining = remaining !== null ? parseInt(remaining) : this.duration;
+            }
+
+            // 格式化时间
+            static formatTime(seconds) {
+                seconds = Math.max(0, seconds);
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // 主应用类
+        class TimerApp {
+            constructor() {
+                this.tasks = [];
+                this.currentTaskIndex = null;
+                this.timerInterval = null;
+                this.isRunning = false;
+
+                // DOM 元素
+                this.taskContainer = document.getElementById('taskContainer');
+                this.timerLabel = document.getElementById('timerLabel');
+                this.currentTaskLabel = document.getElementById('currentTaskLabel');
+                this.taskModal = document.getElementById('taskModal');
+                this.completionSound = document.getElementById('completionSound');
+
+                // 绑定事件
+                this.bindEvents();
+
+                // 初始化任务列表
+                this.renderTasks();
+            }
+
+            // 播放完成提示音
+            playCompletionSound() {
+                try {
+                    // 重置音频并播放
+                    this.completionSound.currentTime = 0;
+                    this.completionSound.play().catch(error => {
+                        console.log("音频播放失败:", error);
+                        // 降级处理：提示用户手动播放
+                        alert("任务完成！\n（音频播放需要用户交互权限，请先点击页面任意位置再试）");
+                    });
+                } catch (error) {
+                    console.log("音频播放错误:", error);
+                }
+            }
+
+            // 绑定事件处理
+            bindEvents() {
+                // 任务控制按钮
+                document.getElementById('addTaskBtn').addEventListener('click', () => this.openAddModal());
+                document.getElementById('modifyTaskBtn').addEventListener('click', () => this.openModifyModal());
+                document.getElementById('deleteTaskBtn').addEventListener('click', () => this.deleteTask());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportTasks());
+                document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+                document.getElementById('fileInput').addEventListener('change', (e) => this.importTasks(e));
+
+                // 计时器控制按钮
+                document.getElementById('startTimerBtn').addEventListener('click', () => this.startTimer());
+                document.getElementById('pauseTimerBtn').addEventListener('click', () => this.pauseTimer());
+                document.getElementById('stopTimerBtn').addEventListener('click', () => this.stopTimer());
+
+                // 模态框按钮
+                document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal());
+                document.getElementById('saveBtn').addEventListener('click', () => this.saveTask());
+
+                // 任务项点击事件（委托）
+                this.taskContainer.addEventListener('click', (e) => {
+                    const taskItem = e.target.closest('.task-item');
+                    if (taskItem) {
+                        this.selectTask(parseInt(taskItem.dataset.index));
+                    }
+                });
+
+                // 修复浏览器自动播放限制：需要用户交互后才能播放音频
+                document.addEventListener('click', () => {
+                    // 预加载音频（触发用户交互权限）
+                    this.completionSound.load();
+                }, { once: true });
+            }
+
+            // 渲染任务列表
+            renderTasks() {
+                this.taskContainer.innerHTML = '';
+
+                this.tasks.forEach((task, index) => {
+                    const taskItem = document.createElement('div');
+                    taskItem.className = 'task-item';
+                    taskItem.dataset.index = index;
+                    taskItem.innerHTML = `
+                        <div>${index + 1}</div>
+                        <div>${task.name}</div>
+                        <div>${Task.formatTime(task.duration)}</div>
+                        <div>${Task.formatTime(task.remaining)}</div>
+                        <div>${task.status}</div>
+                    `;
+
+                    // 高亮选中的任务
+                    if (index === this.currentTaskIndex) {
+                        taskItem.style.backgroundColor = '#e9f7fe';
+                    }
+
+                    this.taskContainer.appendChild(taskItem);
+                });
+
+                // 更新当前任务显示
+                if (this.currentTaskIndex !== null && this.tasks[this.currentTaskIndex]) {
+                    this.currentTaskLabel.textContent = `当前任务：${this.tasks[this.currentTaskIndex].name}`;
+                } else {
+                    this.currentTaskLabel.textContent = '未选择任务';
+                    this.timerLabel.textContent = '00:00:00';
+                }
+            }
+
+            // 选择任务
+            selectTask(index) {
+                this.currentTaskIndex = index;
+                this.renderTasks();
+
+                // 更新计时器显示
+                if (this.tasks[index]) {
+                    this.timerLabel.textContent = Task.formatTime(this.tasks[index].remaining);
+                }
+            }
+
+            // 打开添加任务模态框
+            openAddModal() {
+                document.getElementById('modalTitle').textContent = '添加任务';
+                document.getElementById('taskName').value = '';
+                document.getElementById('taskDuration').value = '';
+                this.taskModal.dataset.mode = 'add';
+                this.taskModal.style.display = 'flex';
+            }
+
+            // 打开修改任务模态框
+            openModifyModal() {
+                if (this.currentTaskIndex === null) {
+                    alert('请先选择一个任务！');
+                    return;
+                }
+
+                const task = this.tasks[this.currentTaskIndex];
+                document.getElementById('modalTitle').textContent = '修改任务';
+                document.getElementById('taskName').value = task.name;
+                document.getElementById('taskDuration').value = task.duration;
+                this.taskModal.dataset.mode = 'modify';
+                this.taskModal.style.display = 'flex';
+            }
+
+            // 关闭模态框
+            closeModal() {
+                this.taskModal.style.display = 'none';
+            }
+
+            // 保存任务（添加/修改）
+            saveTask() {
+                const name = document.getElementById('taskName').value.trim();
+                const duration = document.getElementById('taskDuration').value.trim();
+
+                if (!name || !duration || isNaN(duration) || parseInt(duration) <= 0) {
+                    alert('请输入有效的任务名称和时长！');
+                    return;
+                }
+
+                if (this.taskModal.dataset.mode === 'add') {
+                    // 添加新任务
+                    this.tasks.push(new Task(name, duration));
+                } else {
+                    // 修改现有任务
+                    const task = this.tasks[this.currentTaskIndex];
+                    task.name = name;
+                    task.duration = parseInt(duration);
+                    task.remaining = parseInt(duration);
+                    task.status = 'pending';
+                }
+
+                this.closeModal();
+                this.renderTasks();
+            }
+
+            // 删除任务
+            deleteTask() {
+                if (this.currentTaskIndex === null) {
+                    alert('请先选择一个任务！');
+                    return;
+                }
+
+                if (confirm('确定要删除选中的任务吗？')) {
+                    this.tasks.splice(this.currentTaskIndex, 1);
+                    this.currentTaskIndex = null;
+                    this.renderTasks();
+                }
+            }
+
+            // 开始计时
+            startTimer() {
+                if (this.currentTaskIndex === null) {
+                    alert('请先选择一个任务！');
+                    return;
+                }
+
+                const task = this.tasks[this.currentTaskIndex];
+
+                if (task.status === 'completed') {
+                    alert('该任务已完成！');
+                    return;
+                }
+
+                if (this.isRunning) return;
+
+                task.status = 'running';
+                this.isRunning = true;
+
+                this.timerInterval = setInterval(() => {
+                    if (task.remaining <= 0) {
+                        this.stopTimer();
+                        task.status = 'completed';
+                        this.renderTasks();
+                        // 播放完成提示音
+                        this.playCompletionSound();
+                        alert(`任务「${task.name}」已完成！`);
+                        return;
+                    }
+
+                    task.remaining--;
+                    this.timerLabel.textContent = Task.formatTime(task.remaining);
+                    this.renderTasks();
+                }, 1000);
+            }
+
+            // 暂停计时
+            pauseTimer() {
+                if (!this.isRunning) return;
+
+                clearInterval(this.timerInterval);
+                this.isRunning = false;
+
+                if (this.currentTaskIndex !== null) {
+                    this.tasks[this.currentTaskIndex].status = 'paused';
+                    this.renderTasks();
+                }
+            }
+
+            // 停止计时
+            stopTimer() {
+                clearInterval(this.timerInterval);
+                this.isRunning = false;
+
+                if (this.currentTaskIndex !== null) {
+                    const task = this.tasks[this.currentTaskIndex];
+                    task.status = 'pending';
+                    task.remaining = task.duration;
+                    this.timerLabel.textContent = Task.formatTime(task.remaining);
+                    this.renderTasks();
+                }
+            }
+
+            // 导出任务到CSV
+            exportTasks() {
+                if (this.tasks.length === 0) {
+                    alert('暂无任务可导出！');
+                    return;
+                }
+
+                // 构建CSV内容
+                let csvContent = '任务名称,总时长（秒）,状态,剩余时间（秒）\n';
+                this.tasks.forEach(task => {
+                    csvContent += `${task.name},${task.duration},${task.status},${task.remaining}\n`;
+                });
+
+                // 创建下载链接
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'tasks.csv');
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            // 从CSV导入任务
+            importTasks(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const content = e.target.result;
+                        const lines = content.split('\n');
+                        if (lines.length <= 1) {
+                            alert('CSV文件内容为空！');
+                            return;
+                        }
+
+                        // 解析CSV（跳过表头）
+                        const importedTasks = [];
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+
+                            const [name, duration, status, remaining] = line.split(',');
+                            if (name && duration) {
+                                importedTasks.push(new Task(name, duration, status || 'pending', remaining));
+                            }
+                        }
+
+                        this.tasks = importedTasks;
+                        this.currentTaskIndex = null;
+                        this.renderTasks();
+                        alert(`成功导入 ${importedTasks.length} 个任务！`);
+                    } catch (error) {
+                        alert('导入失败：' + error.message);
+                    }
+
+                    // 清空文件输入
+                    document.getElementById('fileInput').value = '';
+                };
+
+                reader.readAsText(file);
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new TimerApp();
+        });
+    </script>
+</body>
+</html>
