@@ -1,0 +1,77 @@
+将tkinter作为tk导入
+从tkinter导入messagebox
+从输入导入列表
+
+# -------------------------- 修改/删除任务核心逻辑 --------------------------
+def delete _ tasks _ by _ indexes(indexes:List[int]，global_tasks: list):
+    """按索引列表删除任务（逆序删除避免索引错位）"""
+对于反转的idx(指数):
+如果0 <= idx < len(global_tasks):
+global_tasks.pop(idx)
+
+def init_modify_delete_features(根，任务列表框，全局任务，刷新任务列表框):
+"""初始化修改/删除功能的几内亚控件与绑定逻辑"""
+    # 1. 修改任务输入框框架（初始隐藏）
+修改帧= tk。框架(根)
+新名称条目= tk。Entry(modify_frame，width=25，placeholder= "输入新任务名称（可选)")
+新时间条目= tk。Entry(modify_frame，width=15，placeholder= "输入新时长（秒,必填)")
+新名称条目包(side=tk。左，padx=5)
+new_time_entry.pack(side=tk。左，padx=5)
+modify_frame.pack_forget() #初始隐藏
+
+    # 2. 删除任务处理函数
+def handle_delete():
+selected _ indexes = task _ listbox . curs election()
+如果未选择_索引:
+messagebox.showwarning("提示", "请选中要删除的任务!")
+返回
+if messagebox.askyesno("确认"，f "是否删除选中的{ len(selected _ indexes)}个任务?"):
+delete _tasks _ by _ indices(选定的_ indexes，全局_ tasks)
+刷新任务列表框()
+messagebox.showinfo("成功", "任务删除完成!")
+
+    # 3. 修改任务处理函数
+定义handle_modify():
+selected _ indexes = task _ listbox . curs election()
+如果未选择_索引:
+messagebox.showwarning("提示", "请选中一个任务进行修改!")
+返回
+如果len(selected _ indexes)> 1:
+messagebox.showwarning("提示", "一次仅支持修改一个任务!")
+返回
+
+selected _ idx = selected _ indexes[0]
+target _ task = global _ tasks[select _ idx]
+modify_frame.pack(pady=5，fill=tk。X) #显示输入框
+
+        # 确认修改子函数
+def confirm_modify()。
+new_name = new_name_entry.get()。条状()
+new _ time _ str = new _ time _ entry . get()。条状()
+
+            # 校验时长输入
+如果不是new_time_str.isdigit()或int(new_time_str) <= 0:
+messagebox.showerror("错误", "时长必须是正整数（秒)!")
+返回
+
+# 执行修改（调用工作类的更新方法)
+target_task.update(新名称=新名称，新总时间=int(新时间字符串))
+刷新任务列表框()
+            # 清空输入框+隐藏框架
+新名称条目.删除(0，tk。结束)
+new_time_entry.delete(0，tk。结束)
+modify_frame.pack_forget()
+messagebox.showinfo("成功", "任务修改完成!")
+
+        # 防止重复创建确认按钮
+对于modify_frame.winfo_children()中的小部件:
+if widget.widgetName == 'button '和widget['text'] = '确认修改：
+widget.destroy()
+确认_btn = tk。按钮(modify_frame，text= "确认修改“，命令=确认_修改)
+confirm_btn.pack(side=tk。左，padx=5)
+
+    # 4. 创建修改/删除按钮（可直接添加到现有按钮框架）
+modify_btn = tk。按钮(root，text= "修改选中任务"，command=handle_modify，width=12)
+delete_btn = tk。按钮(root，text= "删除选中任务"，command=handle_delete，width=12)
+
+返回修改_btn，删除_btn，修改_帧
